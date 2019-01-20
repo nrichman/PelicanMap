@@ -1,22 +1,31 @@
 package main
 
 import (
-	"fmt"
+	"bufio"
 	"log"
 	"net/http"
+	"os"
 
 	"golang.org/x/net/html"
 )
 
-var villagerURL = "https://stardewvalleywiki.com/Villagers"
+var wikiURL = "https://stardewvalleywiki.com"
 
 func main() {
-	resp, err := http.Get(villagerURL)
+	buildVillagerList()
+}
+
+func getPageTokenizer(url string) *html.Tokenizer {
+	resp, err := http.Get(wikiURL + "/Villagers")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	z := html.NewTokenizer(resp.Body)
+	return html.NewTokenizer(resp.Body)
+}
+
+func buildVillagerList() {
+	z := getPageTokenizer(wikiURL + "/Villagers")
 
 	collecting := false
 	neighborSet := make(map[string]struct{})
@@ -36,9 +45,7 @@ func main() {
 				}
 
 				if a.Key == "id" && a.Val == "Non-giftable_NPCs" {
-					for key := range neighborSet {
-						fmt.Println(key)
-					}
+					writeSliceToFile("test.txt", keysToSlice(neighborSet))
 				}
 
 				if collecting {
@@ -49,4 +56,30 @@ func main() {
 			}
 		}
 	}
+}
+
+func keysToSlice(m map[string]struct{}) []string {
+	s := []string{}
+
+	for key := range m {
+		s = append(s, key)
+	}
+
+	return s
+}
+
+func writeSliceToFile(filename string, s []string) {
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	w := bufio.NewWriter(file)
+
+	for _, v := range s {
+		_, _ = w.WriteString(v + "\n")
+	}
+
+	w.Flush()
+	file.Close()
 }
