@@ -30,23 +30,36 @@ func getPageTokenizer(url string) *html.Tokenizer {
 	return html.NewTokenizer(resp.Body)
 }
 
+func printMess(m map[string]map[string][]string) {
+	for key, val := range m {
+		fmt.Println(key)
+		for key2, val2 := range val {
+			fmt.Println("  " + key2)
+			for _, val3 := range val2 {
+				fmt.Print("    ", val3)
+			}
+		}
+	}
+}
+
 func buildSchedule() {
 	//url := wikiURL + parseFileToSlice("villagerList.txt")[0]
 	url := wikiURL + "/Alex"
 
 	z := getPageTokenizer(url)
 
-	headers := map[string][]string{
-		"Spring":   []string{},
-		"Summer":   []string{},
-		"Fall":     []string{},
-		"Winter":   []string{},
-		"Marriage": []string{},
+	headers := map[string]map[string][]string{
+		"Spring":   map[string][]string{},
+		"Summer":   map[string][]string{},
+		"Fall":     map[string][]string{},
+		"Winter":   map[string][]string{},
+		"Marriage": map[string][]string{},
 	}
 
 	header := ""
 	collecting := false
 	s := []string{}
+	constraint := ""
 
 	for {
 		tt := z.Next()
@@ -67,15 +80,17 @@ func buildSchedule() {
 				}
 
 				if a.Key == "title" {
-					fmt.Println(a.Val)
 					if _, ok := headers[a.Val]; ok {
 						if header != a.Val {
+							if constraint != "" {
+								headers[header][constraint] = s
+							}
 							header = a.Val
-							writeSliceToFile(header+".txt", s)
 							s = []string{}
 						}
 					}
 					if header == "Marriage" {
+						printMess(headers)
 						return
 					}
 				}
@@ -86,7 +101,11 @@ func buildSchedule() {
 				z.Next()
 				inner := z.Next()
 				if inner == html.TextToken {
-					s = append(s, (string)(z.Text()))
+					if constraint != "" {
+						headers[header][constraint] = s
+						s = []string{}
+					}
+					constraint = (string)(z.Text())
 				}
 			}
 
