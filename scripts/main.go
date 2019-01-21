@@ -46,6 +46,7 @@ func buildSchedule() {
 
 	header := ""
 	collecting := false
+	s := []string{}
 
 	for {
 		tt := z.Next()
@@ -70,8 +71,8 @@ func buildSchedule() {
 					if _, ok := headers[a.Val]; ok {
 						if header != a.Val {
 							header = a.Val
-							fmt.Println(header)
-
+							writeSliceToFile(header+".txt", s)
+							s = []string{}
 						}
 					}
 					if header == "Marriage" {
@@ -80,19 +81,20 @@ func buildSchedule() {
 				}
 			}
 
-			// Gets the table header
+			// Gets the table constraint
 			if header != "" && t.Data == "p" {
 				z.Next()
 				inner := z.Next()
 				if inner == html.TextToken {
-					//fmt.Println(z.Text())
+					s = append(s, (string)(z.Text()))
 				}
 			}
 
+			// Gets the table values
 			if header != "" && t.Data == "td" {
 				inner := z.Next()
 				if inner == html.TextToken {
-					fmt.Println((string)(z.Text()))
+					s = append(s, (string)(z.Text()))
 				}
 			}
 		}
