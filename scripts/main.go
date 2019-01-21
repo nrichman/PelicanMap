@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,16 +13,90 @@ import (
 var wikiURL = "https://stardewvalleywiki.com"
 
 func main() {
-	buildVillagerList()
+	//buildVillagerList()
+	buildSchedule()
 }
 
 func getPageTokenizer(url string) *html.Tokenizer {
-	resp, err := http.Get(wikiURL + "/Villagers")
+	resp, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	if resp.StatusCode != 200 {
+		log.Fatal("Bad request.")
+	}
+
 	return html.NewTokenizer(resp.Body)
+}
+
+func buildSchedule() {
+	//url := wikiURL + parseFileToSlice("villagerList.txt")[0]
+	url := wikiURL + "/Alex"
+
+	z := getPageTokenizer(url)
+
+	headers := map[string][]string{
+		"Spring":   []string{},
+		"Summer":   []string{},
+		"Fall":     []string{},
+		"Winter":   []string{},
+		"Marriage": []string{},
+	}
+
+	header := ""
+	collecting := false
+
+	for {
+		tt := z.Next()
+
+		if tt == html.ErrorToken {
+			break
+		}
+
+		if tt == html.StartTagToken {
+			t := z.Token()
+			for _, a := range t.Attr {
+				if a.Key == "id" && a.Val == "Schedule" {
+					collecting = true
+				}
+
+				if !collecting {
+					continue
+				}
+
+				if a.Key == "title" {
+					fmt.Println(a.Val)
+					if _, ok := headers[a.Val]; ok {
+						if header != a.Val {
+							header = a.Val
+							fmt.Println(header)
+
+						}
+					}
+					if header == "Marriage" {
+						return
+					}
+				}
+			}
+
+			// Gets the table header
+			if header != "" && t.Data == "p" {
+				z.Next()
+				inner := z.Next()
+				if inner == html.TextToken {
+					//fmt.Println(z.Text())
+				}
+			}
+
+			if header != "" && t.Data == "td" {
+				inner := z.Next()
+				if inner == html.TextToken {
+					fmt.Println((string)(z.Text()))
+				}
+			}
+		}
+	}
 }
 
 func buildVillagerList() {
@@ -45,7 +120,7 @@ func buildVillagerList() {
 				}
 
 				if a.Key == "id" && a.Val == "Non-giftable_NPCs" {
-					writeSliceToFile("test.txt", keysToSlice(neighborSet))
+					writeSliceToFile("villagerList.txt", keysToSlice(neighborSet))
 				}
 
 				if collecting {
@@ -77,9 +152,29 @@ func writeSliceToFile(filename string, s []string) {
 	w := bufio.NewWriter(file)
 
 	for _, v := range s {
-		_, _ = w.WriteString(v + "\n")
+		w.WriteString(v + "\n")
 	}
 
 	w.Flush()
 	file.Close()
+}
+
+func parseFileToSlice(filename string) []string {
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r := bufio.NewReader(file)
+	s := []string{}
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			break
+		}
+
+		s = append(s, line[:len(line)-1])
+	}
+
+	return s
 }
