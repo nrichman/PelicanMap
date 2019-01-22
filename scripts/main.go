@@ -36,7 +36,7 @@ func printMess(m map[string]map[string][]string) {
 		for key2, val2 := range val {
 			fmt.Println("  " + key2)
 			for _, val3 := range val2 {
-				fmt.Print("    ", val3)
+				fmt.Println("    ", val3)
 			}
 		}
 	}
@@ -48,18 +48,19 @@ func buildSchedule() {
 
 	z := getPageTokenizer(url)
 
-	headers := map[string]map[string][]string{
+	seasons := map[string]map[string][]string{
 		"Spring":   map[string][]string{},
 		"Summer":   map[string][]string{},
 		"Fall":     map[string][]string{},
 		"Winter":   map[string][]string{},
 		"Marriage": map[string][]string{},
 	}
-
-	header := ""
-	collecting := false
-	s := []string{}
+	season := ""
 	constraint := ""
+	time := ""
+	s := []string{}
+
+	collecting := false
 
 	for {
 		tt := z.Next()
@@ -79,41 +80,59 @@ func buildSchedule() {
 					continue
 				}
 
+				// Gets the current season
 				if a.Key == "title" {
-					if _, ok := headers[a.Val]; ok {
-						if header != a.Val {
+					if _, ok := seasons[a.Val]; ok {
+						// Selected season changes
+						if season != a.Val {
+							// Fill in the last constraint of the season
 							if constraint != "" {
-								headers[header][constraint] = s
+								seasons[season][constraint] = s
 							}
-							header = a.Val
+							season = a.Val
 							s = []string{}
 						}
 					}
-					if header == "Marriage" {
-						printMess(headers)
+
+					// Exit condition
+					if season == "Marriage" {
+						printMess(seasons)
 						return
 					}
 				}
 			}
 
-			// Gets the table constraint
-			if header != "" && t.Data == "p" {
-				z.Next()
+			// Only parse data if a season is selected
+			if season != "" {
 				inner := z.Next()
-				if inner == html.TextToken {
-					if constraint != "" {
-						headers[header][constraint] = s
-						s = []string{}
+				switch t.Data {
+				// Gets
+				case "p":
+					inner = z.Next()
+					if inner == html.TextToken {
+						if constraint != "" {
+							seasons[season][constraint] = s
+							s = []string{}
+						}
+						constraint = (string)(z.Text())
 					}
-					constraint = (string)(z.Text())
-				}
-			}
+				// Builds a time/location string from a table
+				case "td":
+					if inner == html.TextToken {
+						token := (string)(z.Text())
+						token = token[:len(token)-1]
+						if token == "" {
+							continue
+						}
 
-			// Gets the table values
-			if header != "" && t.Data == "td" {
-				inner := z.Next()
-				if inner == html.TextToken {
-					s = append(s, (string)(z.Text()))
+						if time == "" {
+							time = token
+						} else {
+							location := token
+							s = append(s, time+";"+location)
+							time = ""
+						}
+					}
 				}
 			}
 		}
