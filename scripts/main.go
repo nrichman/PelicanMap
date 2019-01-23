@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -32,11 +31,14 @@ func getPageTokenizer(url string) *html.Tokenizer {
 
 func printMess(m map[string]map[string][]string) {
 	for key, val := range m {
-		fmt.Println(key)
+		//fmt.Println(key)
+		writeSliceToFile("test.txt", append([]string{}, key), false, "")
 		for key2, val2 := range val {
-			fmt.Println("  " + key2)
+			//fmt.Println("  " + key2)
+			writeSliceToFile("test.txt", append([]string{}, key2), false, "  ")
 			for _, val3 := range val2 {
-				fmt.Println("    ", val3)
+				//fmt.Println("    ", val3)
+				writeSliceToFile("test.txt", append([]string{}, val3), false, "    ")
 			}
 		}
 	}
@@ -72,6 +74,16 @@ func buildSchedule() {
 		if tt == html.StartTagToken {
 			t := z.Token()
 			for _, a := range t.Attr {
+				if a.Key == "id" && a.Val == "Relationships" {
+					if constraint != "" {
+						seasons[season][constraint] = s
+					}
+					season = a.Val
+					s = []string{}
+					printMess(seasons)
+					return
+				}
+
 				if a.Key == "id" && a.Val == "Schedule" {
 					collecting = true
 				}
@@ -93,21 +105,15 @@ func buildSchedule() {
 							s = []string{}
 						}
 					}
-
-					// Exit condition
-					if season == "Marriage" {
-						printMess(seasons)
-						return
-					}
 				}
 			}
 
 			// Only parse data if a season is selected
 			if season != "" {
-				inner := z.Next()
 				switch t.Data {
 				// Gets
 				case "p":
+					inner := z.Next()
 					inner = z.Next()
 					if inner == html.TextToken {
 						if constraint != "" {
@@ -118,6 +124,7 @@ func buildSchedule() {
 					}
 				// Builds a time/location string from a table
 				case "td":
+					inner := z.Next()
 					if inner == html.TextToken {
 						token := (string)(z.Text())
 						token = token[:len(token)-1]
@@ -160,7 +167,7 @@ func buildVillagerList() {
 				}
 
 				if a.Key == "id" && a.Val == "Non-giftable_NPCs" {
-					writeSliceToFile("villagerList.txt", keysToSlice(neighborSet))
+					writeSliceToFile("villagerList.txt", keysToSlice(neighborSet), true, "")
 				}
 
 				if collecting {
@@ -183,8 +190,14 @@ func keysToSlice(m map[string]struct{}) []string {
 	return s
 }
 
-func writeSliceToFile(filename string, s []string) {
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+func writeSliceToFile(filename string, s []string, create bool, head string) {
+	flags := os.O_CREATE | os.O_WRONLY
+
+	if !create {
+		flags = flags | os.O_APPEND
+	}
+
+	file, err := os.OpenFile(filename, flags, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -192,7 +205,7 @@ func writeSliceToFile(filename string, s []string) {
 	w := bufio.NewWriter(file)
 
 	for _, v := range s {
-		w.WriteString(v + "\n")
+		w.WriteString(head + v + "\n")
 	}
 
 	w.Flush()
