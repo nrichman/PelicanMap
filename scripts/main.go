@@ -12,8 +12,10 @@ import (
 var wikiURL = "https://stardewvalleywiki.com"
 
 func main() {
-	//buildVillagerList()
-	buildSchedule()
+	//retrieveNeighbors()
+	s := "/Emily"
+	sch := retrieveSchedule(s)
+	printMess(s, sch)
 }
 
 func getPageTokenizer(url string) *html.Tokenizer {
@@ -29,41 +31,39 @@ func getPageTokenizer(url string) *html.Tokenizer {
 	return html.NewTokenizer(resp.Body)
 }
 
-func printMess(m map[string]map[string][]string) {
+func printMess(neighbor string, m map[string]map[string][]string) {
+	file := "schedules/" + neighbor[1:] + ".txt"
 	for key, val := range m {
 		//fmt.Println(key)
-		writeSliceToFile("test.txt", append([]string{}, key), false, "")
+		writeSliceToFile(file, append([]string{}, key), false, "")
 		for key2, val2 := range val {
 			//fmt.Println("  " + key2)
-			writeSliceToFile("test.txt", append([]string{}, key2), false, "  ")
+			writeSliceToFile(file, append([]string{}, key2), false, "  ")
 			for _, val3 := range val2 {
 				//fmt.Println("    ", val3)
-				writeSliceToFile("test.txt", append([]string{}, val3), false, "    ")
+				writeSliceToFile(file, append([]string{}, val3), false, "    ")
 			}
 		}
 	}
 }
 
-func buildSchedule() {
-	//url := wikiURL + parseFileToSlice("villagerList.txt")[0]
-	url := wikiURL + "/Alex"
-
-	z := getPageTokenizer(url)
-
-	seasons := map[string]map[string][]string{
-		"Spring":   map[string][]string{},
-		"Summer":   map[string][]string{},
-		"Fall":     map[string][]string{},
-		"Winter":   map[string][]string{},
-		"Marriage": map[string][]string{},
+func retrieveSchedule(neighbor string) map[string]map[string][]string {
+	schedule := map[string]map[string][]string{
+		"Spring":     map[string][]string{},
+		"Summer":     map[string][]string{},
+		"Fall":       map[string][]string{},
+		"Winter":     map[string][]string{},
+		"Marriage":   map[string][]string{},
+		"Deviations": map[string][]string{},
 	}
-	season := ""
-	constraint := ""
-	time := ""
-	s := []string{}
+
+	var season string
+	var constraint string
+	var time string
+	var s []string
 
 	collecting := false
-
+	z := getPageTokenizer(wikiURL + neighbor)
 	for {
 		tt := z.Next()
 
@@ -76,14 +76,12 @@ func buildSchedule() {
 			for _, a := range t.Attr {
 				if a.Key == "id" && a.Val == "Relationships" {
 					if constraint != "" {
-						seasons[season][constraint] = s
+						schedule[season][constraint] = s
 					}
-					season = a.Val
-					s = []string{}
-					printMess(seasons)
-					return
+					return schedule
 				}
 
+				// Don't start building the schedule until we've passed the tag
 				if a.Key == "id" && a.Val == "Schedule" {
 					collecting = true
 				}
@@ -94,12 +92,13 @@ func buildSchedule() {
 
 				// Gets the current season
 				if a.Key == "title" {
-					if _, ok := seasons[a.Val]; ok {
+					if _, ok := schedule[a.Val]; ok {
 						// Selected season changes
 						if season != a.Val {
-							// Fill in the last constraint of the season
+							// Fill in the last constraint before changing season
 							if constraint != "" {
-								seasons[season][constraint] = s
+								schedule[season][constraint] = s
+								constraint = ""
 							}
 							season = a.Val
 							s = []string{}
@@ -111,13 +110,13 @@ func buildSchedule() {
 			// Only parse data if a season is selected
 			if season != "" {
 				switch t.Data {
-				// Gets
+				// Gets a constrant from <p><b>{CONSTRAINT}</b></p>
 				case "p":
 					inner := z.Next()
 					inner = z.Next()
 					if inner == html.TextToken {
 						if constraint != "" {
-							seasons[season][constraint] = s
+							schedule[season][constraint] = s
 							s = []string{}
 						}
 						constraint = (string)(z.Text())
@@ -144,9 +143,10 @@ func buildSchedule() {
 			}
 		}
 	}
+	return nil
 }
 
-func buildVillagerList() {
+func retrieveNeighbors() {
 	z := getPageTokenizer(wikiURL + "/Villagers")
 
 	collecting := false
