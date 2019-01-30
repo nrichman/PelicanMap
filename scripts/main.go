@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 
 	"golang.org/x/net/html"
 )
@@ -12,10 +13,21 @@ import (
 var wikiURL = "https://stardewvalleywiki.com"
 
 func main() {
-	//retrieveNeighbors()
-	s := "/Emily"
-	sch := retrieveSchedule(s)
-	printMess(s, sch)
+
+	neighbors := retrieveNeighbors()
+
+	var wg sync.WaitGroup
+	wg.Add(len(neighbors))
+
+	for _, l := range neighbors {
+		go func(link string) {
+			defer wg.Done()
+			sch := retrieveSchedule(link)
+			printMess(link, sch)
+		}(l)
+	}
+
+	wg.Wait()
 }
 
 func getPageTokenizer(url string) *html.Tokenizer {
@@ -146,7 +158,7 @@ func retrieveSchedule(neighbor string) map[string]map[string][]string {
 	return nil
 }
 
-func retrieveNeighbors() {
+func retrieveNeighbors() []string {
 	z := getPageTokenizer(wikiURL + "/Villagers")
 
 	collecting := false
@@ -168,6 +180,7 @@ func retrieveNeighbors() {
 
 				if a.Key == "id" && a.Val == "Non-giftable_NPCs" {
 					writeSliceToFile("villagerList.txt", keysToSlice(neighborSet), true, "")
+					return keysToSlice(neighborSet)
 				}
 
 				if collecting {
@@ -178,6 +191,7 @@ func retrieveNeighbors() {
 			}
 		}
 	}
+	return nil
 }
 
 func keysToSlice(m map[string]struct{}) []string {
